@@ -4,7 +4,7 @@ import RBush from 'rbush';
 const enum GameConstants {
     boundaryWidth = 8000,
     boundaryHeight = 6000,
-    maxShipVelocity = 1,
+    maxShipVelocity = 2,
     shipTurnRate = 0.05,
     shipAccelerationRate = 0.05,
     explosionRadius = 40,
@@ -152,8 +152,7 @@ class RobotShip extends Ship {
                 if (!this.polygon.active) {
                     return;
                 }
-                // const targetCoordinates = this.torpedoDestination(scene.player);
-                const targetCoordinates = { x: scene.player.polygon.x, y: scene.player.polygon.y };
+                const targetCoordinates = this.torpedoDestination(scene.player);
                 scene.launchTorpedo(this, targetCoordinates.x, targetCoordinates.y);
             },
             callbackScope: this,
