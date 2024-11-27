@@ -152,23 +152,56 @@ class RobotShip extends Ship {
                 if (!this.polygon.active) {
                     return;
                 }
-                const targetCoordinates = this.torpedoDestination(scene.player);
+                const targetCoordinates = this.torpedoDestination(scene.player.polygon.getCenter(), scene.player.velocity);
                 scene.launchTorpedo(this, targetCoordinates.x, targetCoordinates.y);
             },
-            callbackScope: this,
             loop: true
         });
 
-        this.timers.push(changeCourseTimer, fireTorpedoTimer);
+        const fireDefensiveTorpedoTimer = scene.time.addEvent({
+            delay: 2000,
+            callback: () => {
+                if (!this.polygon.active) {
+                    return;
+                }
+
+                for (const [torpedo, { velocity }] of scene.torpedoes) {
+
+                    // distance between the robot player and the torpedo
+                    const distance = Phaser.Math.Distance.Between(this.polygon.x, this.polygon.y, torpedo.x, torpedo.y);
+                    if (distance > 500 || distance < 100) {
+                        continue;
+                    }
+
+                    // Step 1: Calculate the relative position vector
+                    const torpedoPosition = new Phaser.Math.Vector2(torpedo.x, torpedo.y);
+                    const relativePosition = torpedoPosition.clone().subtract(this.polygon.getCenter());
+
+                    // Step 2: Calculate the relative velocity vector
+                    const relativeVelocity = velocity.clone().subtract(this.velocity);
+
+                    // Step 3: Project the relative velocity onto the relative position vector
+                    const projection = relativeVelocity.dot(relativePosition);
+
+                    // Step 4: Check if the projection is negative
+                    if (projection < 0) {
+                        // fire a defensive torpedo
+                        const targetCoordinates = this.torpedoDestination(torpedoPosition, velocity);
+                        scene.launchTorpedo(this, targetCoordinates.x, targetCoordinates.y);
+                        return;
+                    }
+                }
+            },
+            loop: true
+        });
+
+        this.timers.push(changeCourseTimer, fireTorpedoTimer, fireDefensiveTorpedoTimer);
     }
 
-    torpedoDestination(target: Ship) {
+    torpedoDestination(targetPos: Phaser.Math.Vector2, targetVelocity: Phaser.Math.Vector2) {
         const torpedoSpeed = GameConstants.torpedoSpeed;
 
         const currentPos = new Phaser.Math.Vector2(this.polygon.x, this.polygon.y);
-        const targetPos = new Phaser.Math.Vector2(target.polygon.x, target.polygon.y);
-        const targetVelocity = target.velocity;
-
         const distanceVec = targetPos.clone().subtract(currentPos);
         const distance = distanceVec.length();
 
@@ -197,12 +230,13 @@ class RobotShip extends Ship {
 
 class Scene extends Phaser.Scene {
     public player!: Ship;
+    public torpedoes = new Map<Phaser.GameObjects.Graphics, { velocity: Phaser.Math.Vector2, targetX: number, targetY: number }>();
+
     private robotPlayers = new Array<RobotShip>();
     private starfield!: Phaser.GameObjects.Graphics;
     private asteroids!: Phaser.GameObjects.Graphics;
     private asteroidTree!: RBush<{ minX: number, minY: number, maxX: number, maxY: number, size: number }>;
     private stars: { x: number, y: number, greyValue: number }[] = [];
-    private torpedoes = new Map<Phaser.GameObjects.Graphics, { velocity: Phaser.Math.Vector2, targetX: number, targetY: number }>();
     private explosions = new Set<Phaser.GameObjects.Graphics>();
     private gameState = GameState.BeforeStart;
     private startText!: Phaser.GameObjects.Text;
