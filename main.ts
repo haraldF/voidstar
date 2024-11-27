@@ -363,21 +363,17 @@ class Scene extends Phaser.Scene {
             this.player.desiredVelocity = newVelocity;
         }
         if (cursors.space.isDown) {
-
             // Gradually reduce the player's velocity towards zero
             const decelerationRate = GameConstants.shipAccelerationRate;
             const newVelocity = this.player.velocity.clone();
 
-            newVelocity.x *= (1 - decelerationRate);
-            newVelocity.y *= (1 - decelerationRate);
+            const currentSpeed = newVelocity.length();
+            const newSpeed = Math.max(0, currentSpeed - decelerationRate);
 
-            // If the velocity is very low, just set it to zero
-            if (Math.abs(newVelocity.x) < decelerationRate) {
-                newVelocity.x = 0;
+            if (currentSpeed > 0) {
+                newVelocity.normalize().scale(newSpeed);
             }
-            if (Math.abs(newVelocity.y) < decelerationRate) {
-                newVelocity.y = 0;
-            }
+
             this.player.desiredVelocity = newVelocity;
         }
     }
