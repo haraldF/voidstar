@@ -1,0 +1,24 @@
+{
+  "name": "voidstar",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "webpack --mode production",
+    "start": "webpack-dev-server --mode development --open",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Harald Fernengel <547273+haraldF@users.noreply.github.com>",
+  "license": "Apache-2.0",
+  "description": "A little game written with Phaser 3",
+  "dependencies": {
+    "phaser": "^3.87.0",
+    "rbush": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/rbush": "^4.0.0",
+    "html-webpack-plugin": "^5.6.3",
+    "ts-loader": "^9.5.1",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^5.1.0"
+  }
+}
