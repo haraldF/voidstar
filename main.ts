@@ -2,13 +2,15 @@ import 'phaser';
 import RBush from 'rbush';
 
 const enum GameConstants {
+    // world size in pixels
     boundaryWidth = 8000,
     boundaryHeight = 6000,
-    maxShipVelocity = 2,
+    maxShipVelocity = 140,
     shipTurnRate = 0.05,
-    shipAccelerationRate = 0.05,
+    shipAccelerationRate = 2,
     explosionRadius = 40,
-    torpedoSpeed = 3,
+    torpedoSpeed = 200,
+    // blast time in miliseconds
     torpedoBlastTime = 700
 }
 
@@ -20,14 +22,17 @@ const enum GameState {
 
 class Ship {
     public desiredRotation = 0;
-    public velocity = new Phaser.Math.Vector2();
-    private _desiredVelocity = new Phaser.Math.Vector2();
+    public readonly _desiredVelocity = new Phaser.Math.Vector2(0, 0);
+
     public readonly polygon: Phaser.GameObjects.Polygon;
+    public readonly body: Phaser.Physics.Arcade.Body;
     public readonly marker: Phaser.GameObjects.Graphics;
 
     constructor(polygon: Phaser.GameObjects.Polygon, marker: Phaser.GameObjects.Graphics) {
         this.polygon = polygon;
-        this.polygon.setOrigin(0, 0);
+        this.body = polygon.body as Phaser.Physics.Arcade.Body;
+        this.body.setCollideWorldBounds(true);
+        this.body.setMaxSpeed(GameConstants.maxShipVelocity);
 
         this.marker = marker;
         this.marker.fillStyle(this.polygon.fillColor, 1);
@@ -37,16 +42,16 @@ class Ship {
     }
 
     set desiredVelocity(value: Phaser.Math.Vector2) {
-        this._desiredVelocity = value;
         const magnitude = this._desiredVelocity.length();
         const clampedMagnitude = Phaser.Math.Clamp(magnitude, -GameConstants.maxShipVelocity, GameConstants.maxShipVelocity);
         if (magnitude != clampedMagnitude) {
             this._desiredVelocity.normalize().scale(clampedMagnitude);
         }
+        this._desiredVelocity.set(value.x, value.y);
     }
 
     get desiredVelocity() {
-        return this._desiredVelocity;
+        return this._desiredVelocity.clone();
     }
 
     destroy() {
@@ -85,37 +90,24 @@ class Ship {
 
     update() {
         // Gradually adjust the velocity towards the desired velocity
-        if (!this.desiredVelocity.equals(this.velocity)) {
-            this.velocity.lerp(this.desiredVelocity, GameConstants.shipAccelerationRate);
-            // if it's too close, just set it to the desired velocity
-            if (this.velocity.distance(this.desiredVelocity) < GameConstants.shipAccelerationRate) {
-                this.velocity.copy(this.desiredVelocity);
+        const currentVelocity = this.body.velocity;
+        const desiredVelocity = this._desiredVelocity;
+
+        if (!desiredVelocity.equals(currentVelocity)) {
+            currentVelocity.lerp(desiredVelocity, GameConstants.shipAccelerationRate);
+            if (currentVelocity.distanceSq(desiredVelocity) < GameConstants.shipAccelerationRate ** 2) {
+                currentVelocity.copy(desiredVelocity);
             }
         }
 
         if (this.desiredRotation !== this.polygon.rotation) {
-            // Calculate the shortest angular distance to the desired rotation
             let deltaRotation = this.desiredRotation - this.polygon.rotation;
             deltaRotation = Phaser.Math.Angle.Wrap(deltaRotation);
-
             this.polygon.rotation += deltaRotation * GameConstants.shipTurnRate;
 
             if (Math.abs(this.polygon.rotation - this.desiredRotation) < GameConstants.shipTurnRate) {
                 this.polygon.rotation = this.desiredRotation;
             }
-        }
-
-        this.polygon.x += this.velocity.x;
-        this.polygon.y += this.velocity.y;
-
-        // Ensure the player stays within the boundaries and set velocity to zero if boundaries are hit
-        if (this.polygon.x <= 0 || this.polygon.x >= GameConstants.boundaryWidth) {
-            this.velocity.x = 0;
-            this.polygon.x = Phaser.Math.Clamp(this.polygon.x, 0, GameConstants.boundaryWidth);
-        }
-        if (this.polygon.y <= 0 || this.polygon.y >= GameConstants.boundaryHeight) {
-            this.velocity.y = 0;
-            this.polygon.y = Phaser.Math.Clamp(this.polygon.y, 0, GameConstants.boundaryHeight);
         }
     }
 }
@@ -126,8 +118,6 @@ class RobotShip extends Ship {
 
     constructor(polygon: Phaser.GameObjects.Polygon, marker: Phaser.GameObjects.Graphics) {
         super(polygon, marker);
-
-        this.polygon.rotation = Phaser.Math.FloatBetween(0, 2 * Math.PI);
     }
 
     destroy() {
@@ -152,7 +142,7 @@ class RobotShip extends Ship {
                 if (!this.polygon.active) {
                     return;
                 }
-                const targetCoordinates = this.torpedoDestination(scene.player.polygon.getCenter(), scene.player.velocity);
+                const targetCoordinates = this.torpedoDestination(scene.player.polygon.getCenter(), scene.player.body.velocity);
                 scene.launchTorpedo(this, targetCoordinates.x, targetCoordinates.y);
             },
             loop: true
@@ -168,8 +158,8 @@ class RobotShip extends Ship {
                 for (const [torpedo, { velocity }] of scene.torpedoes) {
 
                     // distance between the robot player and the torpedo
-                    const distance = Phaser.Math.Distance.Between(this.polygon.x, this.polygon.y, torpedo.x, torpedo.y);
-                    if (distance > 500 || distance < 100) {
+                    const distance = Phaser.Math.Distance.BetweenPointsSquared(this.polygon.getCenter(), torpedo);
+                    if (distance > (500 ** 2) || distance < (100 ** 2)) {
                         continue;
                     }
 
@@ -178,7 +168,7 @@ class RobotShip extends Ship {
                     const relativePosition = torpedoPosition.clone().subtract(this.polygon.getCenter());
 
                     // Step 2: Calculate the relative velocity vector
-                    const relativeVelocity = velocity.clone().subtract(this.velocity);
+                    const relativeVelocity = velocity.clone().subtract(this.body.velocity);
 
                     // Step 3: Project the relative velocity onto the relative position vector
                     const projection = relativeVelocity.dot(relativePosition);
@@ -201,14 +191,36 @@ class RobotShip extends Ship {
     torpedoDestination(targetPos: Phaser.Math.Vector2, targetVelocity: Phaser.Math.Vector2) {
         const torpedoSpeed = GameConstants.torpedoSpeed;
 
-        const currentPos = new Phaser.Math.Vector2(this.polygon.x, this.polygon.y);
+        const currentPos = this.polygon.getCenter();
         const distanceVec = targetPos.clone().subtract(currentPos);
         const distance = distanceVec.length();
 
-        const relativeVelocity = targetVelocity.clone().subtract(distanceVec.clone().normalize().scale(torpedoSpeed));
-        const relativeSpeed = relativeVelocity.length();
+        const targetSpeed = targetVelocity.length();
+        const a = targetSpeed * targetSpeed - torpedoSpeed * torpedoSpeed;
+        const b = 2 * distanceVec.dot(targetVelocity);
+        const c = distance * distance;
 
-        const timeToIntercept = distance / relativeSpeed;
+        const discriminant = b * b - 4 * a * c;
+
+        if (discriminant < 0) {
+            // No real solution, return current target position
+            return { x: targetPos.x, y: targetPos.y };
+        }
+
+        const sqrtDiscriminant = Math.sqrt(discriminant);
+        const t1 = (-b - sqrtDiscriminant) / (2 * a);
+        const t2 = (-b + sqrtDiscriminant) / (2 * a);
+
+        // Choose the smallest positive time
+        let timeToIntercept = Math.min(t1, t2);
+        if (timeToIntercept < 0) {
+            timeToIntercept = Math.max(t1, t2);
+        }
+
+        if (timeToIntercept < 0) {
+            // Both times are negative, no valid time to intercept, return current target position
+            return { x: targetPos.x, y: targetPos.y };
+        }
 
         const futureTargetPos = targetPos.clone().add(targetVelocity.clone().scale(timeToIntercept));
 
@@ -252,6 +264,7 @@ class Scene extends Phaser.Scene {
 
     create() {
         this.gameState = GameState.BeforeStart;
+        this.physics.pause();
 
         // Create starfield background
         this.starfield = this.add.graphics();
@@ -277,12 +290,15 @@ class Scene extends Phaser.Scene {
             this.asteroidTree.insert({ minX: x - size, minY: y - size, maxX: x + size, maxY: y + size, size });
         }
 
-        this.player = new Ship(this.add.polygon(GameConstants.boundaryWidth / 2, GameConstants.boundaryHeight / 2, [0, -25, 15, 25, -15, 25], 0xaaaaaa), this.add.graphics());
+        const coords = [15, 0, 0, 50, 30, 50]
+        const poly = this.add.polygon(GameConstants.boundaryWidth / 2, GameConstants.boundaryHeight / 2, coords, 0xaaaaaa);
+        this.physics.add.existing(poly);
+        this.player = new Ship(poly, this.add.graphics());
 
-        this.robotPlayers.push(new RobotShip(this.add.polygon(GameConstants.boundaryWidth / 2 - 250, GameConstants.boundaryHeight / 2 - 250, [0, -25, 15, 25, -15, 25], 0x990000), this.add.graphics()));
-        this.robotPlayers.push(new RobotShip(this.add.polygon(GameConstants.boundaryWidth / 2 + 250, GameConstants.boundaryHeight / 2 - 250, [0, -25, 15, 25, -15, 25], 0x994444), this.add.graphics()));
-        this.robotPlayers.push(new RobotShip(this.add.polygon(GameConstants.boundaryWidth / 2 - 250, GameConstants.boundaryHeight / 2 + 250, [0, -25, 15, 25, -15, 25], 0x990044), this.add.graphics()));
-        this.robotPlayers.push(new RobotShip(this.add.polygon(GameConstants.boundaryWidth / 2 + 250, GameConstants.boundaryHeight / 2 + 250, [0, -25, 15, 25, -15, 25], 0x994400), this.add.graphics()));
+        this.addRobotShip(-250, -250, 0x990000);
+        this.addRobotShip(250, -250, 0x994444);
+        this.addRobotShip(-250, 250, 0x990044);
+        this.addRobotShip(250, 250, 0x994400);
 
         // Add input listener for pointer events
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -290,6 +306,7 @@ class Scene extends Phaser.Scene {
                 this.launchTorpedo(this.player, pointer.worldX, pointer.worldY);
             } else if (this.gameState === GameState.BeforeStart) {
                 this.startGame();
+                this.physics.resume();
             }
         });
 
@@ -298,13 +315,22 @@ class Scene extends Phaser.Scene {
         this.cameras.main.setDeadzone(100, 100);
 
         // Display "press any key to start" banner
-        this.startText = this.add.text(this.player.polygon.x, this.player.polygon.y, 'Tap screen to start\nCursor keys to rotate, accelerate\nSpace to break\nTap anywhere to shoot', {
+        this.startText = this.add.text(window.innerWidth / 2, window.innerHeight / 2, 'Tap screen to start\nCursor keys to rotate, accelerate\nSpace to break\nTap anywhere to shoot', {
             fontSize: '32px',
             color: '#ffffff',
             align: 'center',
-            backgroundColor: 'rgba(0, 0, 0, 0.5)'
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
         });
         this.startText.setOrigin(0.5, 0.5);
+        this.startText.setScrollFactor(0);
+    }
+
+    addRobotShip(x: number, y: number, color: number) {
+        const coords = [15, 0, 0, 50, 30, 50]
+        const polygon = this.add.polygon(GameConstants.boundaryWidth / 2 + x, GameConstants.boundaryHeight / 2 + y, coords, color);
+        this.physics.add.existing(polygon);
+        const robotPlayer = new RobotShip(polygon, this.add.graphics());
+        this.robotPlayers.push(robotPlayer);
     }
 
     startGame() {
@@ -318,18 +344,23 @@ class Scene extends Phaser.Scene {
 
     launchTorpedo(ship: Ship, targetX: number, targetY: number) {
         const torpedo = this.add.graphics();
+
         torpedo.fillStyle(0xff0000, 1);
         torpedo.fillRect(-2, -10, 4, 20);
         torpedo.x = ship.polygon.x;
         torpedo.y = ship.polygon.y;
 
+        // Add torpedo to the physics system
+        this.physics.add.existing(torpedo);
+        const torpedoBody = torpedo.body as Phaser.Physics.Arcade.Body;
+        torpedoBody.setCollideWorldBounds(false);
+        torpedoBody.setMaxSpeed(GameConstants.torpedoSpeed);
+        this.physics.moveTo(torpedo, targetX, targetY, GameConstants.torpedoSpeed);
+
         const angle = Phaser.Math.Angle.Between(torpedo.x, torpedo.y, targetX, targetY);
         torpedo.rotation = angle + Math.PI / 2;
 
-        const velocity = new Phaser.Math.Vector2();
-        velocity.setToPolar(angle, GameConstants.torpedoSpeed);
-
-        this.torpedoes.set(torpedo, { velocity, targetX, targetY });
+        this.torpedoes.set(torpedo, { velocity: new Phaser.Math.Vector2(), targetX, targetY });
 
         const timeout = 30 * 1000;
         this.time.delayedCall(timeout, () => {
@@ -384,14 +415,14 @@ class Scene extends Phaser.Scene {
         if (cursors.up.isDown) {
             // increase the velocity in the direction of the ship by GameConstants.shipAccelerationRate
             const angle = this.player.polygon.rotation - Math.PI / 2;
-            const newVelocity = this.player.velocity.clone();
+            const newVelocity = this.player.body.velocity.clone();
             newVelocity.x += Math.cos(angle) * GameConstants.shipAccelerationRate;
             newVelocity.y += Math.sin(angle) * GameConstants.shipAccelerationRate;
             this.player.desiredVelocity = newVelocity;
         }
         if (cursors.down.isDown) {
             const angle = this.player.polygon.rotation - Math.PI / 2;
-            const newVelocity = this.player.velocity.clone();
+            const newVelocity = this.player.body.velocity.clone();
             newVelocity.x -= Math.cos(angle) * GameConstants.shipAccelerationRate;
             newVelocity.y -= Math.sin(angle) * GameConstants.shipAccelerationRate;
             this.player.desiredVelocity = newVelocity;
@@ -399,7 +430,7 @@ class Scene extends Phaser.Scene {
         if (cursors.space.isDown) {
             // Gradually reduce the player's velocity towards zero
             const decelerationRate = GameConstants.shipAccelerationRate;
-            const newVelocity = this.player.velocity.clone();
+            const newVelocity = this.player.body.velocity.clone();
 
             const currentSpeed = newVelocity.length();
             const newSpeed = Math.max(0, currentSpeed - decelerationRate);
@@ -414,11 +445,9 @@ class Scene extends Phaser.Scene {
 
     updateTorpedoes() {
         for (const [torpedo, { velocity, targetX, targetY }] of this.torpedoes) {
-            torpedo.x += velocity.x;
-            torpedo.y += velocity.y;
 
             // Check if torpedo reached the target position
-            if (Phaser.Math.Distance.Between(torpedo.x, torpedo.y, targetX, targetY) < GameConstants.torpedoSpeed) {
+            if (Phaser.Math.Distance.Between(torpedo.x, torpedo.y, targetX, targetY) < 2) {
                 torpedo.destroy();
                 this.torpedoes.delete(torpedo);
                 this.explodeTorpedo(torpedo);
@@ -449,12 +478,12 @@ class Scene extends Phaser.Scene {
         }
 
         for (const explosion of this.explosions) {
-            if (this.player.polygon.active && Phaser.Math.Distance.Between(this.player.polygon.x, this.player.polygon.y, explosion.x, explosion.y) < GameConstants.explosionRadius) {
+            if (this.player.polygon.active && Phaser.Math.Distance.BetweenPointsSquared(this.player.polygon.getCenter(), explosion) < GameConstants.explosionRadius ** 2) {
                 this.player.destroy();
                 this.createDebris(this.player);
             }
             for (const robotPlayer of this.robotPlayers) {
-                if (robotPlayer.polygon.active && Phaser.Math.Distance.Between(robotPlayer.polygon.x, robotPlayer.polygon.y, explosion.x, explosion.y) < GameConstants.explosionRadius) {
+                if (robotPlayer.polygon.active && Phaser.Math.Distance.BetweenPointsSquared(robotPlayer.polygon.getCenter(), explosion) < GameConstants.explosionRadius ** 2) {
                     robotPlayer.destroy();
                     this.createDebris(robotPlayer);
                 }
@@ -516,12 +545,12 @@ class Scene extends Phaser.Scene {
 
     private cleanup() {
         this.player.destroy();
-        this.player.velocity.set(0, 0);
+        this.player.body.velocity.set(0, 0);
         this.player.desiredVelocity.set(0, 0);
 
         for (const robotPlayer of this.robotPlayers) {
             robotPlayer.destroy();
-            robotPlayer.velocity.set(0, 0);
+            robotPlayer.body.velocity.set(0, 0);
             this.player.desiredVelocity.set(0, 0);
         }
 
@@ -541,15 +570,17 @@ class Scene extends Phaser.Scene {
     private gameOver() {
 
         this.gameState = GameState.GameOver;
+        this.physics.pause();
 
         const message = this.player.polygon.active ? 'You win!' : 'You lose!';
 
         // Add "Game Over" text
-        const gameOverText = this.add.text(this.cameras.main.worldView.centerX, this.cameras.main.worldView.centerY, message, {
+        const gameOverText = this.add.text(window.innerWidth / 2, window.innerHeight / 2, message, {
             fontSize: '64px',
             color: '#ffffff' // Change color to white for better visibility
         });
         gameOverText.setOrigin(0.5, 0.5); // Center the text
+        gameOverText.setScrollFactor(0); // Ensure the text is fixed on the screen
 
         // Fade out the text
         this.tweens.add({
@@ -558,6 +589,7 @@ class Scene extends Phaser.Scene {
             duration: 3000,
             ease: 'Power1',
             onComplete: () => {
+                gameOverText.destroy();
                 this.cleanup();
                 this.scene.restart();
             }
@@ -574,7 +606,19 @@ const config: Phaser.Types.Core.GameConfig = {
     width: window.innerWidth,
     height: window.innerHeight,
     backgroundColor: '#000000',
-    scene: new Scene()
+    scene: new Scene(),
+    physics: {
+        default: 'arcade',
+        arcade: {
+            debug: false,
+            // debugShowVelocity: true,
+            x: 0,
+            y: 0,
+            width: GameConstants.boundaryWidth,
+            height: GameConstants.boundaryHeight,
+
+        }
+    }
 };
 
 const game = new Phaser.Game(config);
