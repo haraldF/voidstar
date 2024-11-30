@@ -1,17 +1,21 @@
 import 'phaser';
 import RBush from 'rbush';
 
-const enum GameConstants {
+const urlParams = new URLSearchParams(window.location.search);
+
+const GameConstants = {
     // world size in pixels
-    boundaryWidth = 8000,
-    boundaryHeight = 6000,
-    maxShipVelocity = 140,
-    shipTurnRate = 0.05,
-    shipAccelerationRate = 2,
-    explosionRadius = 40,
-    torpedoSpeed = 200,
+    boundaryWidth: 8000,
+    boundaryHeight: 6000,
+    // ship velocity in pixels per second
+    maxShipVelocity: parseFloat(urlParams.get('maxShipVelocity') ?? '140'),
+    shipTurnRate: parseFloat(urlParams.get('shipTurnRate') ?? '0.05'),
+    shipAccelerationRate: parseFloat(urlParams.get('shipAccelerationRate') ?? '2'),
+    explosionRadius: parseFloat(urlParams.get('explosionRadius') ?? '40'),
+    torpedoSpeed: parseFloat(urlParams.get('torpedoSpeed') ?? '200'),
     // blast time in miliseconds
-    torpedoBlastTime = 700
+    torpedoBlastTime: parseFloat(urlParams.get('torpedoBlastTime') ?? '700'),
+    enemyShipCount: parseFloat(urlParams.get('enemyShipCount') ?? '4')
 }
 
 const enum GameState {
@@ -290,15 +294,12 @@ class Scene extends Phaser.Scene {
             this.asteroidTree.insert({ minX: x - size, minY: y - size, maxX: x + size, maxY: y + size, size });
         }
 
-        const coords = [15, 0, 0, 50, 30, 50]
+        const coords = [15, 0, 0, 50, 30, 50];
         const poly = this.add.polygon(GameConstants.boundaryWidth / 2, GameConstants.boundaryHeight / 2, coords, 0xaaaaaa);
         this.physics.add.existing(poly);
         this.player = new Ship(poly, this.add.graphics());
 
-        this.addRobotShip(-250, -250, 0x990000);
-        this.addRobotShip(250, -250, 0x994444);
-        this.addRobotShip(-250, 250, 0x990044);
-        this.addRobotShip(250, 250, 0x994400);
+        this.addRobotShips();
 
         // Add input listener for pointer events
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -323,6 +324,34 @@ class Scene extends Phaser.Scene {
         });
         this.startText.setOrigin(0.5, 0.5);
         this.startText.setScrollFactor(0);
+    }
+
+    addRobotShips() {
+        const center = new Phaser.Math.Vector2(GameConstants.boundaryWidth / 2, GameConstants.boundaryHeight / 2);
+        const angleStep = Math.PI * 2 / GameConstants.enemyShipCount;
+        const radius = 400;
+
+        const colorPalette = [
+            0x2f4f4f,
+            0x228b22,
+            0x7f0000,
+            0x000080,
+            0xff8c00,
+            0x00ff00,
+            0x00ffff,
+            0xff00ff,
+            0x1e90ff,
+            0xffff54,
+            0xff69b4,
+            0xffe4c4
+        ];
+
+        for (let i = 0; i < GameConstants.enemyShipCount; i++) {
+            const angle = angleStep * i;
+            const position = center.clone().setToPolar(angle, radius);
+            const color = colorPalette[i % colorPalette.length];
+            this.addRobotShip(position.x, position.y, color);
+        }
     }
 
     addRobotShip(x: number, y: number, color: number) {
