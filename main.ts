@@ -256,6 +256,7 @@ class Scene extends Phaser.Scene {
     private explosions = new Set<Phaser.GameObjects.Graphics>();
     private gameState = GameState.BeforeStart;
     private startText!: Phaser.GameObjects.Text;
+    private readonly lastPointerDown = new Phaser.Math.Vector2(-1, -1);
 
     constructor() {
         super({
@@ -301,15 +302,8 @@ class Scene extends Phaser.Scene {
 
         this.addRobotShips();
 
-        // Add input listener for pointer events
-        this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-            if (this.gameState === GameState.Running) {
-                this.launchTorpedo(this.player, pointer.worldX, pointer.worldY);
-            } else if (this.gameState === GameState.BeforeStart) {
-                this.startGame();
-                this.physics.resume();
-            }
-        });
+        this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => { this.onPointerDown(pointer); });
+        this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => { this.onPointerUp(pointer); });
 
         // Make the camera follow the player
         this.cameras.main.startFollow(this.player.polygon);
@@ -324,6 +318,38 @@ class Scene extends Phaser.Scene {
         });
         this.startText.setOrigin(0.5, 0.5);
         this.startText.setScrollFactor(0);
+    }
+
+    onPointerDown(pointer: Phaser.Input.Pointer) {
+        if (this.gameState !== GameState.Running) {
+            return;
+        }
+
+        this.lastPointerDown.set(pointer.x, pointer.y);
+    }
+
+    onPointerUp(pointer: Phaser.Input.Pointer) {
+
+        if (this.gameState === GameState.BeforeStart) {
+            this.startGame();
+            this.physics.resume();
+            return;
+        }
+
+        if (this.gameState !== GameState.Running) {
+            return;
+        }
+
+        const pointerUp = new Phaser.Math.Vector2(pointer.x, pointer.y);
+        if (Phaser.Math.Distance.BetweenPointsSquared(this.lastPointerDown, pointerUp) < 100) {
+            this.launchTorpedo(this.player, pointer.worldX, pointer.worldY);
+            return;
+        }
+
+        const angle = Phaser.Math.Angle.BetweenPoints(this.lastPointerDown, pointerUp);
+        this.player.desiredRotation = angle + Math.PI / 2;
+        const velocity = this.physics.velocityFromRotation(angle, GameConstants.maxShipVelocity);
+        this.player.desiredVelocity = new Phaser.Math.Vector2(velocity.x, velocity.y);
     }
 
     addRobotShips() {
@@ -433,6 +459,7 @@ class Scene extends Phaser.Scene {
     }
 
     updateCursorKeys() {
+
         const cursors = this.input.keyboard!.createCursorKeys();
 
         if (cursors.left.isDown) {
