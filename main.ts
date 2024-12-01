@@ -103,7 +103,6 @@ class Ship {
                 currentVelocity.copy(desiredVelocity);
             }
         }
-
         if (this.desiredRotation !== this.polygon.rotation) {
             let deltaRotation = this.desiredRotation - this.polygon.rotation;
             deltaRotation = Phaser.Math.Angle.Wrap(deltaRotation);
@@ -337,6 +336,11 @@ class Scene extends Phaser.Scene {
         }
 
         if (this.gameState !== GameState.Running) {
+            return;
+        }
+
+        // last pointer down is not from this game
+        if (this.lastPointerDown.x === -1 && this.lastPointerDown.y === -1) {
             return;
         }
 
@@ -621,6 +625,8 @@ class Scene extends Phaser.Scene {
         this.explosions.clear();
 
         this.starfield.clear();
+
+        this.lastPointerDown.set(-1, -1);
     }
 
     private gameOver() {
