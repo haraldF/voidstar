@@ -1,5 +1,6 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 /** @type {import('webpack').Configuration} */
 module.exports = {
@@ -23,7 +24,12 @@ module.exports = {
     plugins: [
         new HtmlWebpackPlugin({
             filename: 'index.html',
-            title: 'VoidStar'
+            template: 'index.html'
+        }),
+        new CopyWebpackPlugin({
+            patterns: [
+                { from: 'public', to: 'dist' }
+            ]
         })
     ],
     devtool: 'source-map',
