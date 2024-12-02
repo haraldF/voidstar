@@ -30,6 +30,15 @@ const config: Phaser.Types.Core.GameConfig = {
 
 const game = new Phaser.Game(config);
 
-window.addEventListener('resize', () => {
+function resizeToFit() {
     game.scale.resize(window.innerWidth, window.innerHeight);
-});
+}
+
+window.addEventListener('resize', resizeToFit);
+
+if (window.screen.orientation) {
+    window.screen.orientation.addEventListener('change', resizeToFit);
+} else {
+    // Fallback to legacy orientation change event
+    window.addEventListener('orientationchange', resizeToFit);
+}
