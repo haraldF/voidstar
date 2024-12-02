@@ -26,5 +26,8 @@ module.exports = {
             title: 'VoidStar'
         })
     ],
-    devtool: 'source-map'
+    devtool: 'source-map',
+    devServer: {
+        allowedHosts: 'all',
+    }
 };
