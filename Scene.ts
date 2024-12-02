@@ -78,7 +78,7 @@ export class Scene extends Phaser.Scene implements GameInterface {
         this.cameras.main.setDeadzone(100, 100);
 
         // Display "press any key to start" banner
-        this.startText = this.add.text(window.innerWidth / 2, window.innerHeight / 2, 'Tap to shoot\nSwipe to change course\nTap anywhere to start', {
+        this.startText = this.add.text(this.scale.width / 2, this.scale.height / 2, 'Tap to shoot\nSwipe to change course\nTap anywhere to start', {
             fontSize: '32px',
             color: '#ffffff',
             align: 'center',
@@ -86,6 +86,10 @@ export class Scene extends Phaser.Scene implements GameInterface {
         });
         this.startText.setOrigin(0.5, 0.5);
         this.startText.setScrollFactor(0);
+
+        this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
+            this.startText.setPosition(gameSize.width / 2, gameSize.height / 2);
+        });
     }
 
     onPointerDown(pointer: Phaser.Input.Pointer) {
@@ -362,7 +366,7 @@ export class Scene extends Phaser.Scene implements GameInterface {
         const message = this.player.polygon.active ? 'You win!' : 'You lose!';
 
         // Add "Game Over" text
-        const gameOverText = this.add.text(window.innerWidth / 2, window.innerHeight / 2, message, {
+        const gameOverText = this.add.text(this.scale.width / 2, this.scale.height / 2, message, {
             fontSize: '64px',
             color: '#ffffff' // Change color to white for better visibility
         });
