@@ -28,7 +28,7 @@ module.exports = {
         }),
         new CopyWebpackPlugin({
             patterns: [
-                { from: 'public', to: 'dist' }
+                { from: 'public', to: '' }
             ]
         })
     ],
