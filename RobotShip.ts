@@ -17,12 +17,12 @@ export class RobotShip extends Ship {
     }
 
     start(scene: Phaser.Scene, gameInterface: GameInterface) {
-        this.changeCourse(scene);
+        this.changeCourse(gameInterface);
 
         // Add timer event to update robot player's rotation and velocity randomly
         const changeCourseTimer = scene.time.addEvent({
             delay: 4000 + Phaser.Math.FloatBetween(-500, 500),
-            callback: () => this.changeCourse(scene),
+            callback: () => this.changeCourse(gameInterface),
             loop: true
         });
 
@@ -117,8 +117,19 @@ export class RobotShip extends Ship {
         return { x: futureTargetPos.x, y: futureTargetPos.y };
     }
 
-    changeCourse(scene: Phaser.Scene) {
+    changeCourse(gameInterface: GameInterface) {
         if (!this.polygon.active) {
+            return;
+        }
+
+        if (Phaser.Math.Distance.BetweenPointsSquared(gameInterface.player.polygon, this.polygon) > 250000) {
+            // Set target rotation to face the player
+            this.desiredRotation = Phaser.Math.Angle.Between(this.polygon.x, this.polygon.y, gameInterface.player.polygon.x, gameInterface.player.polygon.y) + Math.PI / 2;
+            // Don't head straight to the player or the robots might all lump together
+            this.desiredRotation += Phaser.Math.FloatBetween(-Math.PI / 3, Math.PI / 3);
+            const newVelocity = new Phaser.Math.Vector2();
+            newVelocity.setToPolar(this.desiredRotation - Math.PI / 2, GameConstants.maxShipVelocity);
+            this.desiredVelocity = newVelocity;
             return;
         }
 
