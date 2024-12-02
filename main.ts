@@ -14,6 +14,11 @@ const config: Phaser.Types.Core.GameConfig = {
     height: window.innerHeight,
     backgroundColor: '#000000',
     scene: new Scene(),
+    scale: {
+        mode: Phaser.Scale.EXPAND,
+        autoCenter: Phaser.Scale.RESIZE,
+        expandParent: true
+    },
     physics: {
         default: 'arcade',
         arcade: {
@@ -29,16 +34,3 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 const game = new Phaser.Game(config);
-
-function resizeToFit() {
-    game.scale.resize(window.innerWidth, window.innerHeight);
-}
-
-window.addEventListener('resize', resizeToFit);
-
-if (window.screen.orientation) {
-    window.screen.orientation.addEventListener('change', resizeToFit);
-} else {
-    // Fallback to legacy orientation change event
-    window.addEventListener('orientationchange', resizeToFit);
-}
