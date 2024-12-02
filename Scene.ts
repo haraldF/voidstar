@@ -24,6 +24,9 @@ export class Scene extends Phaser.Scene implements GameInterface {
     private startText!: Phaser.GameObjects.Text;
     private readonly lastPointerDown = new Phaser.Math.Vector2(-1, -1);
 
+    private static readonly shipDimensions = [7.5, 0, 0, 25, 15, 25]
+
+
     constructor() {
         super({
             key: 'main'
@@ -61,8 +64,7 @@ export class Scene extends Phaser.Scene implements GameInterface {
             this.asteroidTree.insert({ minX: x - size, minY: y - size, maxX: x + size, maxY: y + size, size });
         }
 
-        const coords = [15, 0, 0, 50, 30, 50];
-        const poly = this.add.polygon(GameConstants.boundaryWidth / 2, GameConstants.boundaryHeight / 2, coords, 0xaaaaaa);
+        const poly = this.add.polygon(GameConstants.boundaryWidth / 2, GameConstants.boundaryHeight / 2, Scene.shipDimensions, 0xaaaaaa);
         this.physics.add.existing(poly);
         this.player = new Ship(poly, this.add.graphics());
 
@@ -152,8 +154,7 @@ export class Scene extends Phaser.Scene implements GameInterface {
     }
 
     addRobotShip(x: number, y: number, color: number) {
-        const coords = [15, 0, 0, 50, 30, 50]
-        const polygon = this.add.polygon(GameConstants.boundaryWidth / 2 + x, GameConstants.boundaryHeight / 2 + y, coords, color);
+        const polygon = this.add.polygon(GameConstants.boundaryWidth / 2 + x, GameConstants.boundaryHeight / 2 + y, Scene.shipDimensions, color);
         this.physics.add.existing(polygon);
         const robotPlayer = new RobotShip(polygon, this.add.graphics());
         this.robotPlayers.push(robotPlayer);
@@ -172,7 +173,7 @@ export class Scene extends Phaser.Scene implements GameInterface {
         const torpedo = this.add.graphics();
 
         torpedo.fillStyle(0xff0000, 1);
-        torpedo.fillRect(-2, -10, 4, 20);
+        torpedo.fillRect(-1, -5, 2, 10);
         torpedo.x = ship.polygon.x;
         torpedo.y = ship.polygon.y;
 
@@ -305,9 +306,9 @@ export class Scene extends Phaser.Scene implements GameInterface {
 
         for (let i = 0; i < 20; i++) {
             const points = [
-                { x: Phaser.Math.Between(-10, 10), y: Phaser.Math.Between(-10, 10) },
-                { x: Phaser.Math.Between(-10, 10), y: Phaser.Math.Between(-10, 10) },
-                { x: Phaser.Math.Between(-10, 10), y: Phaser.Math.Between(-10, 10) }
+                { x: Phaser.Math.Between(-5, 5), y: Phaser.Math.Between(-5, 5) },
+                { x: Phaser.Math.Between(-5, 5), y: Phaser.Math.Between(-5, 5) },
+                { x: Phaser.Math.Between(-5, 5), y: Phaser.Math.Between(-5, 5) }
             ];
             const debris = this.add.polygon(x, y, points, ship.polygon.fillColor);
 
@@ -316,8 +317,8 @@ export class Scene extends Phaser.Scene implements GameInterface {
                 targets: debris,
                 ease: 'Power2',
                 duration: 3000,
-                x: debris.x + Phaser.Math.Between(-100, 100),
-                y: debris.y + Phaser.Math.Between(-100, 100),
+                x: debris.x + Phaser.Math.Between(-50, 50),
+                y: debris.y + Phaser.Math.Between(-50, 50),
                 angle: debris.angle + rotationSpeed,
                 alpha: 0,
                 onComplete: () => {
