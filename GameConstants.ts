@@ -13,5 +13,8 @@ export const GameConstants = {
     torpedoSpeed: parseFloat(urlParams.get('torpedoSpeed') ?? '100'),
     // blast time in miliseconds
     torpedoBlastTime: parseFloat(urlParams.get('torpedoBlastTime') ?? '700'),
-    enemyShipCount: parseFloat(urlParams.get('enemyShipCount') ?? '4')
+    torpedoBays: parseFloat(urlParams.get('torpedoBays') ?? '5'),
+    // torpedo reload time in miliseconds
+    torpedoReloadTime: parseFloat(urlParams.get('torpedoReloadTime') ?? '1000'),
+    enemyShipCount: parseFloat(urlParams.get('enemyShipCount') ?? '4'),
 }

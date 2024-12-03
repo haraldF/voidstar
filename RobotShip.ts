@@ -45,7 +45,7 @@ export class RobotShip extends Ship {
                     return;
                 }
 
-                for (const [torpedo, { velocity }] of gameInterface.torpedoes) {
+                for (const [torpedo, { targetX, targetY }] of gameInterface.torpedoes) {
 
                     // distance between the robot player and the torpedo
                     const distance = Phaser.Math.Distance.BetweenPointsSquared(this.polygon.getCenter(), torpedo);
@@ -57,8 +57,10 @@ export class RobotShip extends Ship {
                     const torpedoPosition = new Phaser.Math.Vector2(torpedo.x, torpedo.y);
                     const relativePosition = torpedoPosition.clone().subtract(this.polygon.getCenter());
 
+                    const torpedoVelocity = new Phaser.Math.Vector2(targetX - torpedo.x, targetY - torpedo.y).normalize().scale(GameConstants.torpedoSpeed);
+
                     // Step 2: Calculate the relative velocity vector
-                    const relativeVelocity = velocity.clone().subtract(this.body.velocity);
+                    const relativeVelocity = torpedoVelocity.clone().subtract(this.body.velocity);
 
                     // Step 3: Project the relative velocity onto the relative position vector
                     const projection = relativeVelocity.dot(relativePosition);
@@ -66,7 +68,7 @@ export class RobotShip extends Ship {
                     // Step 4: Check if the projection is negative
                     if (projection < 0) {
                         // fire a defensive torpedo
-                        const targetCoordinates = this.torpedoDestination(torpedoPosition, velocity);
+                        const targetCoordinates = this.torpedoDestination(torpedoPosition, torpedoVelocity);
                         gameInterface.launchTorpedo(this, targetCoordinates.x, targetCoordinates.y);
                         return;
                     }

@@ -9,7 +9,7 @@ export class Ship {
     public readonly body: Phaser.Physics.Arcade.Body;
     public readonly marker: Phaser.GameObjects.Graphics;
 
-    private static readonly shipAccelerationRateSq = GameConstants.shipAccelerationRate ** 2;
+    public readyTorpedoBays = GameConstants.torpedoBays;
 
     constructor(polygon: Phaser.GameObjects.Polygon, marker: Phaser.GameObjects.Graphics) {
         this.polygon = polygon;
@@ -24,6 +24,27 @@ export class Ship {
         this.marker.fillTriangle(-10, -10, 10, -10, 0, 10);
         this.marker.setDepth(10); // Ensure the marker is on top of other objects
         this.marker.setVisible(false);
+    }
+
+    // reloads the first available torpedo bay
+    // return false if all torpedo bays are busy
+    public reloadTorpedoBay(): boolean {
+
+        if (this.readyTorpedoBays === 0) {
+            return false;
+        }
+
+        this.readyTorpedoBays--;
+
+        const timer = this.polygon.scene.time.addEvent({
+            delay: GameConstants.torpedoReloadTime,
+            callback: () => {
+                this.readyTorpedoBays++;
+                timer.destroy();
+            }
+        });
+
+        return true;
     }
 
     set desiredVelocity(value: Phaser.Math.Vector2) {

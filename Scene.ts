@@ -12,14 +12,13 @@ const enum GameState {
 
 export class Scene extends Phaser.Scene implements GameInterface {
     public player!: Ship;
-    public torpedoes = new Map<Phaser.GameObjects.Graphics, { velocity: Phaser.Math.Vector2, targetX: number, targetY: number }>();
+    public readonly torpedoes = new Map<Phaser.GameObjects.Graphics, { targetX: number, targetY: number, destinationMarker?: Phaser.GameObjects.Graphics }>();
 
-    private robotPlayers = new Array<RobotShip>();
+    private readonly robotPlayers = new Array<RobotShip>();
     private starfield!: Phaser.GameObjects.Graphics;
     private asteroids!: Phaser.GameObjects.Graphics;
     private asteroidTree!: RBush<{ minX: number, minY: number, maxX: number, maxY: number, size: number }>;
-    private stars: { x: number, y: number, greyValue: number }[] = [];
-    private explosions = new Set<Phaser.GameObjects.Graphics>();
+    private readonly explosions = new Set<Phaser.GameObjects.Graphics>();
     private gameState = GameState.BeforeStart;
     private startText!: Phaser.GameObjects.Text;
     private readonly lastPointerDown = new Phaser.Math.Vector2(-1, -1);
@@ -46,7 +45,6 @@ export class Scene extends Phaser.Scene implements GameInterface {
             const x = Phaser.Math.Between(0, GameConstants.boundaryWidth);
             const y = Phaser.Math.Between(0, GameConstants.boundaryHeight);
             const greyValue = Phaser.Math.Between(100, 255); // Random grey value
-            this.stars.push({ x, y, greyValue });
             this.starfield.fillStyle(Phaser.Display.Color.GetColor(greyValue, greyValue, greyValue), 1);
             this.starfield.fillPoint(x, y, 2);
         }
@@ -78,7 +76,7 @@ export class Scene extends Phaser.Scene implements GameInterface {
         this.cameras.main.setDeadzone(100, 100);
 
         // Display "press any key to start" banner
-        this.startText = this.add.text(this.scale.width / 2, this.scale.height / 2, 'Tap to shoot\nSwipe to change course\nTap anywhere to start', {
+        this.startText = this.add.text(this.scale.width / 2, this.scale.height / 2, 'Tap to shoot\nSwipe to fly\nTap to start', {
             fontSize: '32px',
             color: '#ffffff',
             align: 'center',
@@ -101,7 +99,6 @@ export class Scene extends Phaser.Scene implements GameInterface {
     }
 
     onPointerUp(pointer: Phaser.Input.Pointer) {
-
         if (this.gameState === GameState.BeforeStart) {
             this.startGame();
             this.physics.resume();
@@ -135,18 +132,20 @@ export class Scene extends Phaser.Scene implements GameInterface {
         const radius = 400;
 
         const colorPalette = [
-            0x2f4f4f,
-            0x228b22,
-            0x7f0000,
-            0x000080,
-            0xff8c00,
-            0x00ff00,
-            0x00ffff,
-            0xff00ff,
-            0x1e90ff,
-            0xffff54,
-            0xff69b4,
-            0xffe4c4
+            0xFF0000, // Bright Red
+            0xFF7F00, // Bright Orange
+            0xFFFF00, // Bright Yellow
+            0x7FFF00, // Bright Chartreuse Green
+            0x00FF00, // Bright Green
+            0x00FF7F, // Bright Spring Green
+            0x00FFFF, // Bright Cyan
+            0x007FFF, // Bright Azure
+            0x0000FF, // Bright Blue
+            0x7F00FF, // Bright Violet
+            0xFF00FF, // Bright Magenta
+            0xFF007F, // Bright Rose
+            0xFFFFFF, // Bright White
+            0xFFFF7F  // Bright Light Yellow
         ];
 
         for (let i = 0; i < GameConstants.enemyShipCount; i++) {
@@ -174,12 +173,26 @@ export class Scene extends Phaser.Scene implements GameInterface {
     }
 
     launchTorpedo(ship: Ship, targetX: number, targetY: number) {
-        const torpedo = this.add.graphics();
 
+        if (!ship.reloadTorpedoBay()) {
+            // No torpedoes left
+            return;
+        }
+
+        const torpedo = this.add.graphics();
         torpedo.fillStyle(0xff0000, 1);
         torpedo.fillRect(-1, -5, 2, 10);
         torpedo.x = ship.polygon.x;
         torpedo.y = ship.polygon.y;
+
+        let destinationMarker: Phaser.GameObjects.Graphics | undefined = undefined;
+        if (ship === this.player) {
+            destinationMarker = this.add.graphics();
+            destinationMarker.fillStyle(0xdd0000, 1);
+            destinationMarker.fillCircle(0, 0, 4);
+            destinationMarker.x = targetX;
+            destinationMarker.y = targetY;
+        }
 
         // Add torpedo to the physics system
         this.physics.add.existing(torpedo);
@@ -191,13 +204,11 @@ export class Scene extends Phaser.Scene implements GameInterface {
         const angle = Phaser.Math.Angle.Between(torpedo.x, torpedo.y, targetX, targetY);
         torpedo.rotation = angle + Math.PI / 2;
 
-        this.torpedoes.set(torpedo, { velocity: new Phaser.Math.Vector2(), targetX, targetY });
+        this.torpedoes.set(torpedo, { targetX, targetY, destinationMarker });
 
         const timeout = 30 * 1000;
         this.time.delayedCall(timeout, () => {
             if (torpedo.active) {
-                torpedo.destroy();
-                this.torpedoes.delete(torpedo);
                 this.explodeTorpedo(torpedo);
             }
         }, [], this);
@@ -232,21 +243,22 @@ export class Scene extends Phaser.Scene implements GameInterface {
         });
 
         this.explosions.add(explosion);
+
+        torpedo.destroy();
+
+        this.torpedoes.get(torpedo)?.destinationMarker?.destroy();
+        this.torpedoes.delete(torpedo);
     }
 
     updateTorpedoes() {
-        for (const [torpedo, { velocity, targetX, targetY }] of this.torpedoes) {
+        for (const [torpedo, { targetX, targetY }] of this.torpedoes) {
 
             // Check if torpedo reached the target position
             if (Phaser.Math.Distance.Between(torpedo.x, torpedo.y, targetX, targetY) < 2) {
-                torpedo.destroy();
-                this.torpedoes.delete(torpedo);
                 this.explodeTorpedo(torpedo);
             } else {
                 for (const explosions of this.explosions) {
                     if (Phaser.Math.Distance.Between(torpedo.x, torpedo.y, explosions.x, explosions.y) < GameConstants.explosionRadius) {
-                        torpedo.destroy();
-                        this.torpedoes.delete(torpedo);
                         this.explodeTorpedo(torpedo);
                         break;
                     }
@@ -260,8 +272,6 @@ export class Scene extends Phaser.Scene implements GameInterface {
                 const x = (maybeCollidingAsteroid.minX + maybeCollidingAsteroid.maxX) / 2;
                 const y = (maybeCollidingAsteroid.minY + maybeCollidingAsteroid.maxY) / 2;
                 if (Phaser.Math.Distance.Between(torpedo.x, torpedo.y, x, y) < maybeCollidingAsteroid.size) {
-                    torpedo.destroy();
-                    this.torpedoes.delete(torpedo);
                     this.explodeTorpedo(torpedo);
                     break;
                 }
@@ -343,8 +353,9 @@ export class Scene extends Phaser.Scene implements GameInterface {
             this.player.desiredVelocity.set(0, 0);
         }
 
-        for (const torpedo of this.torpedoes.keys()) {
+        for (const [ torpedo, { destinationMarker} ] of this.torpedoes.entries()) {
             torpedo.destroy();
+            destinationMarker?.destroy();
         }
         this.torpedoes.clear();
 
