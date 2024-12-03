@@ -6,6 +6,7 @@ import { Scene } from './Scene';
 document.body.style.margin = '0';
 document.body.style.padding = '0';
 document.body.style.overflow = 'hidden';
+document.body.style.backgroundColor = '#000000';
 document.addEventListener('contextmenu', event => event.preventDefault());
 
 const config: Phaser.Types.Core.GameConfig = {
