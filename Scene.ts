@@ -188,8 +188,14 @@ export class Scene extends Phaser.Scene implements GameInterface {
         let destinationMarker: Phaser.GameObjects.Graphics | undefined = undefined;
         if (ship === this.player) {
             destinationMarker = this.add.graphics();
-            destinationMarker.fillStyle(0xdd0000, 1);
-            destinationMarker.fillCircle(0, 0, 4);
+            destinationMarker.lineStyle(2, 0x770000, 1);
+            destinationMarker.beginPath();
+            destinationMarker.moveTo(-4, -4);
+            destinationMarker.lineTo(4, 4);
+            destinationMarker.moveTo(4, -4);
+            destinationMarker.lineTo(-4, 4);
+            destinationMarker.closePath();
+            destinationMarker.strokePath();
             destinationMarker.x = targetX;
             destinationMarker.y = targetY;
         }
