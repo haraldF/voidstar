@@ -19,27 +19,31 @@ export class RobotShip extends Ship {
     start(scene: Phaser.Scene, gameInterface: GameInterface) {
         this.changeCourse(gameInterface);
 
+        const difficultyModifier = gameInterface.difficulty === 'easy' ? 2 : 1;
+
         // Add timer event to update robot player's rotation and velocity randomly
         const changeCourseTimer = scene.time.addEvent({
-            delay: 4000 + Phaser.Math.FloatBetween(-500, 500),
+            delay: (4000 * difficultyModifier) + Phaser.Math.FloatBetween(-500, 500),
             callback: () => this.changeCourse(gameInterface),
             loop: true
         });
 
         const fireTorpedoTimer = scene.time.addEvent({
-            delay: 6000 + Phaser.Math.FloatBetween(-500, 500),
+            delay: (6000 * difficultyModifier) + Phaser.Math.FloatBetween(-500, 500),
             callback: () => {
                 if (!this.polygon.active) {
                     return;
                 }
                 const targetCoordinates = this.torpedoDestination(gameInterface.player.polygon.getCenter(), gameInterface.player.body.velocity);
-                gameInterface.launchTorpedo(this, targetCoordinates.x, targetCoordinates.y);
+                const slackX = gameInterface.difficulty === 'easy' ? Phaser.Math.FloatBetween(-100, 100) : 0;
+                const slackY = gameInterface.difficulty === 'easy' ? Phaser.Math.FloatBetween(-100, 100) : 0;
+                gameInterface.launchTorpedo(this, targetCoordinates.x + slackX, targetCoordinates.y + slackY);
             },
             loop: true
         });
 
         const fireDefensiveTorpedoTimer = scene.time.addEvent({
-            delay: 2000,
+            delay: 2000 * difficultyModifier,
             callback: () => {
                 if (!this.polygon.active) {
                     return;

@@ -20,7 +20,12 @@ export class Scene extends Phaser.Scene implements GameInterface {
     private asteroidTree!: RBush<{ minX: number, minY: number, maxX: number, maxY: number, size: number }>;
     private readonly explosions = new Set<Phaser.GameObjects.Graphics>();
     private gameState = GameState.BeforeStart;
+    private introText!: Phaser.GameObjects.Text;
+    private easyText!: Phaser.GameObjects.Text;
+    private hardText!: Phaser.GameObjects.Text;
     private startText!: Phaser.GameObjects.Text;
+
+    public difficulty = 'easy';
     private readonly lastPointerDown = new Phaser.Math.Vector2(-1, -1);
 
     private static readonly shipDimensions = [7.5, 0, 0, 25, 15, 25]
@@ -76,17 +81,83 @@ export class Scene extends Phaser.Scene implements GameInterface {
         this.cameras.main.setDeadzone(100, 100);
 
         // Display "press any key to start" banner
-        this.startText = this.add.text(this.scale.width / 2, this.scale.height / 2, 'Tap to shoot\nSwipe to fly\nTap to start', {
+        this.introText = this.add.text(this.scale.width / 2, this.scale.height / 2, 'Tap to shoot\nSwipe to fly', {
             fontSize: '32px',
             color: '#ffffff',
             align: 'center',
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
         });
+        this.introText.setOrigin(0.5, 0.5);
+        this.introText.setScrollFactor(0);
+
+        // Create text objects for "Easy" and "Hard"
+        this.easyText = this.add.text(this.scale.width / 2 - 100, this.scale.height / 2 + 100, 'Easy', {
+            fontSize: '32px',
+            color: '#ffffff',
+            align: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            padding: { x: 10, y: 10 }
+        });
+        this.easyText.setOrigin(0.5, 0.5);
+        this.easyText.setScrollFactor(0);
+        this.easyText.setInteractive();
+
+        this.hardText = this.add.text(this.scale.width / 2 + 100, this.scale.height / 2 + 100, 'Hard', {
+            fontSize: '32px',
+            color: '#ffffff',
+            align: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            padding: { x: 10, y: 10 }
+        });
+        this.hardText.setOrigin(0.5, 0.5);
+        this.hardText.setScrollFactor(0);
+        this.hardText.setInteractive();
+
+        this.startText = this.add.text(this.scale.width / 2, this.scale.height / 2 + 200, 'Start', {
+            fontSize: '32px',
+            color: '#ffffff',
+            align: 'center',
+            backgroundColor: 'rgba(66, 66, 66, 0.5)',
+            padding: { x: 10, y: 10 },
+        
+        });
         this.startText.setOrigin(0.5, 0.5);
         this.startText.setScrollFactor(0);
+        this.startText.setInteractive();
+
+        // Function to set the difficulty
+        const setDifficulty = (difficulty: string) => {
+            if (difficulty === 'easy') {
+                this.easyText.setStyle({ backgroundColor: 'rgba(0, 255, 0, 0.5)' });
+                this.hardText.setStyle({ backgroundColor: 'rgba(0, 0, 0, 0.5)' });
+            } else if (difficulty === 'hard') {
+                this.easyText.setStyle({ backgroundColor: 'rgba(0, 0, 0, 0.5)' });
+                this.hardText.setStyle({ backgroundColor: 'rgba(255, 0, 0, 0.5)' });
+            }
+            this.difficulty = difficulty;
+        };
+
+        // Add interactivity to the text objects
+        this.easyText.on('pointerdown', () => {
+            setDifficulty('easy');
+        });
+
+        this.hardText.on('pointerdown', () => {
+            setDifficulty('hard');
+        });
+
+        this.startText.on('pointerup', () => {
+            this.startGame();
+        });
+
+        // highlight the default to easy
+        setDifficulty(this.difficulty);
 
         this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
-            this.startText.setPosition(gameSize.width / 2, gameSize.height / 2);
+            this.introText.setPosition(gameSize.width / 2, gameSize.height / 2);
+            this.easyText.setPosition(gameSize.width / 2 - 100, gameSize.height / 2 + 100);
+            this.hardText.setPosition(gameSize.width / 2 + 100, gameSize.height / 2 + 100);
+            this.startText.setPosition(gameSize.width / 2, gameSize.height / 2 + 200);
         });
     }
 
@@ -99,12 +170,6 @@ export class Scene extends Phaser.Scene implements GameInterface {
     }
 
     onPointerUp(pointer: Phaser.Input.Pointer) {
-        if (this.gameState === GameState.BeforeStart) {
-            this.startGame();
-            this.physics.resume();
-            return;
-        }
-
         if (this.gameState !== GameState.Running) {
             return;
         }
@@ -165,11 +230,16 @@ export class Scene extends Phaser.Scene implements GameInterface {
 
     startGame() {
         this.gameState = GameState.Running;
+        this.introText.destroy();
+        this.easyText.destroy();
+        this.hardText.destroy();
         this.startText.destroy();
 
         for (const robotPlayer of this.robotPlayers) {
             robotPlayer.start(this, this);
         }
+
+        this.physics.resume();
     }
 
     launchTorpedo(ship: Ship, targetX: number, targetY: number) {
