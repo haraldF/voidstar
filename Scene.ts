@@ -363,7 +363,7 @@ export class Scene extends Phaser.Scene implements GameInterface {
         for (const [torpedo, { targetX, targetY }] of this.torpedoes) {
 
             // Check if torpedo reached the target position
-            if (Phaser.Math.Distance.Between(torpedo.x, torpedo.y, targetX, targetY) < 2) {
+            if (Phaser.Math.Distance.Squared(torpedo.x, torpedo.y, targetX, targetY) < 4) {
                 this.explodeTorpedo(torpedo);
             } else {
                 for (const explosions of this.explosions) {
@@ -391,7 +391,7 @@ export class Scene extends Phaser.Scene implements GameInterface {
             if (this.player.polygon.active && Phaser.Math.Distance.BetweenPointsSquared(this.player.polygon.getCenter(), explosion) < GameConstants.explosionRadius ** 2) {
                 this.createDebris(this.player);
                 this.player.body.setVelocity(0, 0);
-                this.player.desiredVelocity.set(0, 0);
+                this.player.desiredVelocity = new Phaser.Math.Vector2(0, 0);
                 this.player.polygon.active = false;
                 this.player.polygon.visible = false;
             }
@@ -405,7 +405,7 @@ export class Scene extends Phaser.Scene implements GameInterface {
     }
 
     update() {
-        if (this.gameState !== GameState.Running) {
+        if (this.gameState !== GameState.Running && this.gameState !== GameState.Respawning) {
             return;
         }
 

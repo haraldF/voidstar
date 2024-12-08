@@ -102,14 +102,14 @@ export class Ship {
         // Use lerping to smoothly rotate the ship
         const rotationLerpFactor = 0.1; // Adjust this factor to control the lerp speed
         const newRotation = Phaser.Math.Angle.RotateTo(currentRotation, this.desiredRotation, rotationLerpFactor);
-        
+
         // Use lerping to smoothly accelerate the ship
         const lerpFactor = 0.1; // Adjust this factor to control the lerp speed
         const newVelocity = {
             x: Phaser.Math.Linear(currentVelocity.x, this.desiredVelocity.x, lerpFactor),
             y: Phaser.Math.Linear(currentVelocity.y, this.desiredVelocity.y, lerpFactor)
         };
-    
+
         // Apply the new rotation and velocity to the ship
         this.polygon.rotation = newRotation;
         this.body.setVelocity(newVelocity.x, newVelocity.y);
