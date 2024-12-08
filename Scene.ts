@@ -465,6 +465,22 @@ export class Scene extends Phaser.Scene implements GameInterface {
         this.gameState = GameState.Running;
     }
 
+    private playRespawnAnimation() {
+        // Ensure the player is invisible initially
+        this.player.polygon.visible = true;
+        this.player.polygon.alpha = 0;
+
+        // Create a fade-in tween animation
+        this.tweens.add({
+            targets: this.player.polygon,
+            alpha: 1,
+            duration: 1000, // 1 second duration
+            ease: 'Quint.easeIn',
+            onComplete: () => {
+            }
+        });
+    }
+
     private respawnPlayer() {
 
         if (this.gameState === GameState.Respawning) {
@@ -488,6 +504,10 @@ export class Scene extends Phaser.Scene implements GameInterface {
                 console.log(countdown);
                 countdown--;
                 timerText.setText(`Respawning in ${countdown}...`);
+
+                if (countdown === 1) {
+                    this.playRespawnAnimation();
+                }
 
                 if (countdown <= 0) {
                     timerEvent.remove();
