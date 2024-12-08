@@ -31,7 +31,7 @@ export class RobotShip extends Ship {
         const fireTorpedoTimer = scene.time.addEvent({
             delay: (6000 * difficultyModifier) + Phaser.Math.FloatBetween(-500, 500),
             callback: () => {
-                if (!this.polygon.active) {
+                if (!this.polygon.active || !gameInterface.player.polygon.active) {
                     return;
                 }
                 const targetCoordinates = this.torpedoDestination(gameInterface.player.polygon.getCenter(), gameInterface.player.body.velocity);

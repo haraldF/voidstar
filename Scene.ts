@@ -7,6 +7,7 @@ import { GameInterface } from './GameInterface';
 const enum GameState {
     BeforeStart,
     Running,
+    Respawning,
     GameOver
 }
 
@@ -119,7 +120,7 @@ export class Scene extends Phaser.Scene implements GameInterface {
             align: 'center',
             backgroundColor: 'rgba(66, 66, 66, 0.5)',
             padding: { x: 10, y: 10 },
-        
+
         });
         this.startText.setOrigin(0.5, 0.5);
         this.startText.setScrollFactor(0);
@@ -356,8 +357,11 @@ export class Scene extends Phaser.Scene implements GameInterface {
 
         for (const explosion of this.explosions) {
             if (this.player.polygon.active && Phaser.Math.Distance.BetweenPointsSquared(this.player.polygon.getCenter(), explosion) < GameConstants.explosionRadius ** 2) {
-                this.player.destroy();
                 this.createDebris(this.player);
+                this.player.body.setVelocity(0, 0);
+                this.player.desiredVelocity.set(0, 0);
+                this.player.polygon.active = false;
+                this.player.polygon.visible = false;
             }
             for (const robotPlayer of this.robotPlayers) {
                 if (robotPlayer.polygon.active && Phaser.Math.Distance.BetweenPointsSquared(robotPlayer.polygon.getCenter(), explosion) < GameConstants.explosionRadius ** 2) {
@@ -378,9 +382,14 @@ export class Scene extends Phaser.Scene implements GameInterface {
 
         this.updateTorpedoes();
 
-        const isGameOver = !this.player.polygon.active || this.robotPlayers.every(robotPlayer => !robotPlayer.polygon.active);
+        const isGameOver = this.robotPlayers.every(robotPlayer => !robotPlayer.polygon.active);
         if (isGameOver) {
             this.gameOver();
+        }
+
+        const respawnRequired = !this.player.polygon.active;
+        if (respawnRequired) {
+            this.respawnPlayer();
         }
 
         // Update marker position and visibility
@@ -403,12 +412,17 @@ export class Scene extends Phaser.Scene implements GameInterface {
             const debris = this.add.polygon(x, y, points, ship.polygon.fillColor);
 
             const rotationSpeed = Phaser.Math.Between(-180, 180); // degrees per second
+            const duration = 3000;
+            const velocityScale = 0.4; // Scale down the ship's velocity influence
+            const targetX = debris.x + Phaser.Math.Between(-50, 50) + ship.body.velocity.x * velocityScale * (duration / 1000);
+            const targetY = debris.y + Phaser.Math.Between(-50, 50) + ship.body.velocity.y * velocityScale * (duration / 1000);
+
             this.tweens.add({
                 targets: debris,
                 ease: 'Power2',
-                duration: 3000,
-                x: debris.x + Phaser.Math.Between(-50, 50),
-                y: debris.y + Phaser.Math.Between(-50, 50),
+                duration: duration,
+                x: targetX,
+                y: targetY,
                 angle: debris.angle + rotationSpeed,
                 alpha: 0,
                 onComplete: () => {
@@ -443,6 +457,47 @@ export class Scene extends Phaser.Scene implements GameInterface {
         this.starfield.clear();
 
         this.lastPointerDown.set(-1, -1);
+    }
+
+    private finishRespawn() {
+        this.player.polygon.active = true;
+        this.player.polygon.visible = true;
+        this.gameState = GameState.Running;
+    }
+
+    private respawnPlayer() {
+
+        if (this.gameState === GameState.Respawning) {
+            return;
+        }
+        this.gameState = GameState.Respawning;
+
+        let countdown = GameConstants.respawnTime;
+
+        const timerText = this.add.text(this.scale.width / 2, this.scale.height / 2, "", {
+            fontSize: '64px',
+            color: '#ffffff', // Change color to white for better visibility
+            wordWrap: { width: this.scale.width - 100 }
+        });
+        timerText.setOrigin(0.5, 0.5); // Center the text
+        timerText.setScrollFactor(0); // Ensure the text is fixed on the screen
+
+        const timerEvent = this.time.addEvent({
+            delay: 1000, // 1 second
+            callback: () => {
+                console.log(countdown);
+                countdown--;
+                timerText.setText(`Respawning in ${countdown}...`);
+
+                if (countdown <= 0) {
+                    timerEvent.remove();
+                    timerText.destroy();
+                    this.finishRespawn();
+                }
+            },
+            callbackScope: this,
+            loop: true
+        });
     }
 
     private gameOver() {
