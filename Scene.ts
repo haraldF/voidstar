@@ -501,7 +501,6 @@ export class Scene extends Phaser.Scene implements GameInterface {
         const timerEvent = this.time.addEvent({
             delay: 1000, // 1 second
             callback: () => {
-                console.log(countdown);
                 countdown--;
                 timerText.setText(`Respawning in ${countdown}...`);
 
