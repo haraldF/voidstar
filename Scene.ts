@@ -11,9 +11,16 @@ const enum GameState {
     GameOver
 }
 
+interface TorpedoProperties {
+    targetX: number;
+    targetY: number;
+    destinationMarker?: Phaser.GameObjects.Graphics;
+    emitter: Phaser.GameObjects.Particles.ParticleEmitter;
+}
+
 export class Scene extends Phaser.Scene implements GameInterface {
     public player!: Ship;
-    public readonly torpedoes = new Map<Phaser.GameObjects.Graphics, { targetX: number, targetY: number, destinationMarker?: Phaser.GameObjects.Graphics }>();
+    public readonly torpedoes = new Map<Phaser.GameObjects.Graphics, TorpedoProperties>();
 
     private readonly robotPlayers = new Array<RobotShip>();
     private starfield!: Phaser.GameObjects.Graphics;
@@ -39,6 +46,19 @@ export class Scene extends Phaser.Scene implements GameInterface {
     }
 
     preload() {
+        if (!this.textures.exists('red')) {
+            const canvas = this.textures.createCanvas('red', 2, 2);
+            if (canvas !== null) {
+                const context = canvas.getContext();
+
+                // Draw 4 red pixels
+                context.fillStyle = '#FF0000';
+                context.fillRect(0, 0, 2, 2);
+
+                // Refresh the texture to apply the changes
+                canvas.refresh();
+            }
+        }
     }
 
     create() {
@@ -281,7 +301,16 @@ export class Scene extends Phaser.Scene implements GameInterface {
         const angle = Phaser.Math.Angle.Between(torpedo.x, torpedo.y, targetX, targetY);
         torpedo.rotation = angle + Math.PI / 2;
 
-        this.torpedoes.set(torpedo, { targetX, targetY, destinationMarker });
+        const emitter = this.add.particles(0, 0, 'red', {
+            lifespan: 250,
+            speed: 1,
+            blendMode: Phaser.BlendModes.ADD,
+            tint: { start: 0xff0000, end: 0x000000 }
+        });
+        emitter.startFollow(torpedo);
+        emitter.emitting = true;
+
+        this.torpedoes.set(torpedo, { targetX, targetY, destinationMarker, emitter });
 
         const timeout = 30 * 1000;
         this.time.delayedCall(timeout, () => {
@@ -323,7 +352,10 @@ export class Scene extends Phaser.Scene implements GameInterface {
 
         torpedo.destroy();
 
-        this.torpedoes.get(torpedo)?.destinationMarker?.destroy();
+        const { emitter, destinationMarker } = this.torpedoes.get(torpedo) ?? {};
+        emitter?.destroy();
+        destinationMarker?.destroy();
+
         this.torpedoes.delete(torpedo);
     }
 
@@ -443,9 +475,10 @@ export class Scene extends Phaser.Scene implements GameInterface {
             this.player.desiredVelocity.set(0, 0);
         }
 
-        for (const [ torpedo, { destinationMarker} ] of this.torpedoes.entries()) {
+        for (const [ torpedo, { destinationMarker, emitter } ] of this.torpedoes.entries()) {
             torpedo.destroy();
             destinationMarker?.destroy();
+            emitter.destroy();
         }
         this.torpedoes.clear();
 
