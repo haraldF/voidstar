@@ -26,7 +26,7 @@ export class Scene extends Phaser.Scene implements GameInterface {
     private starfield!: Phaser.GameObjects.Graphics;
     private asteroids!: Phaser.GameObjects.Graphics;
     private asteroidTree!: RBush<{ minX: number, minY: number, maxX: number, maxY: number, size: number }>;
-    private readonly explosions = new Set<Phaser.GameObjects.Graphics>();
+    private readonly explosions = new Set<Phaser.Math.Vector2>();
     private gameState = GameState.BeforeStart;
     private introText!: Phaser.GameObjects.Text;
     private easyText!: Phaser.GameObjects.Text;
@@ -321,31 +321,29 @@ export class Scene extends Phaser.Scene implements GameInterface {
     }
 
     explodeTorpedo(torpedo: Phaser.GameObjects.Graphics) {
-        const explosion = this.add.graphics();
-        explosion.fillStyle(0xff0000, 1);
-        explosion.fillCircle(0, 0, GameConstants.explosionRadius);
-        explosion.x = torpedo.x;
-        explosion.y = torpedo.y;
 
-        this.tweens.add({
-            targets: { dummy: 0},
-            duration: GameConstants.torpedoBlastTime,
-            dummy: 1,
-            ease: 'Power3',
-            onUpdate: tween => {
-                const progress = tween.progress;
-                const startColor = Phaser.Display.Color.ValueToColor(0xff0000);
-                const endColor = Phaser.Display.Color.ValueToColor(0x770000);
-                const currentColor = Phaser.Display.Color.Interpolate.ColorWithColor(startColor, endColor, 100, progress * 100);
-                const colorValue = Phaser.Display.Color.GetColor(currentColor.r, currentColor.g, currentColor.b);
-                explosion.clear();
-                explosion.fillStyle(colorValue, 1);
-                explosion.fillCircle(0, 0, GameConstants.explosionRadius);
-            },
-            onComplete: () => {
-                explosion.destroy();
-                this.explosions.delete(explosion);
-            }
+        const explosion = new Phaser.Math.Vector2(torpedo.x, torpedo.y);
+
+        const lifespan = 500;
+        const fireEmitter = this.add.particles(0, 0, 'red', {
+            x: torpedo.x,
+            y: torpedo.y,
+            // make sure the particles don't travel outside the explosion radius
+            // but add a little more slack so the edges will still be visible
+            speed: (GameConstants.explosionRadius / (lifespan / 1000)) * 1.2,
+            radial: true,
+            scale: { start: 1, end: 0 },
+            blendMode: Phaser.BlendModes.ADD,
+            lifespan,
+            quantity: 50,
+            // tint: { start: 0xff0000, end: 0x000000, ease: Phaser.Math.Easing.Linear }, // Bright yellow to dark red
+            // tintFill: true,
+            duration: GameConstants.torpedoBlastTime
+        });
+
+        fireEmitter.once("complete", () => {
+            this.explosions.delete(explosion);
+            fireEmitter.destroy();
         });
 
         this.explosions.add(explosion);
@@ -481,12 +479,7 @@ export class Scene extends Phaser.Scene implements GameInterface {
             emitter.destroy();
         }
         this.torpedoes.clear();
-
-        for (const explosion of this.explosions) {
-            explosion.destroy();
-        }
         this.explosions.clear();
-
         this.starfield.clear();
 
         this.lastPointerDown.set(-1, -1);
