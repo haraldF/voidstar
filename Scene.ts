@@ -247,6 +247,22 @@ export class Scene extends Phaser.Scene implements GameInterface {
         this.physics.add.existing(polygon);
         const robotPlayer = new RobotShip(polygon, this.add.graphics());
         this.robotPlayers.push(robotPlayer);
+
+        this.physics.add.collider(this.player.polygon, polygon, this.handleShipCollision, undefined, this);
+    }
+
+    handleShipCollision(player: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Physics.Arcade.Body | Phaser.Tilemaps.Tile, robot: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Physics.Arcade.Body | Phaser.Tilemaps.Tile) {
+        if (this.gameState !== GameState.Running) {
+            return;
+        }
+
+        const robotPlayer = this.robotPlayers.find(robotPlayer => robotPlayer.polygon === robot);
+        if (robotPlayer?.polygon.active === false || this.player.polygon.active === false) {
+            return;
+        }
+
+        this.explodePlayer();
+        this.explodeRobotPlayer(robotPlayer!);
     }
 
     startGame() {
@@ -387,19 +403,27 @@ export class Scene extends Phaser.Scene implements GameInterface {
 
         for (const explosion of this.explosions) {
             if (this.player.polygon.active && Phaser.Math.Distance.BetweenPointsSquared(this.player.polygon.getCenter(), explosion) < GameConstants.explosionRadius ** 2) {
-                this.createDebris(this.player);
-                this.player.body.setVelocity(0, 0);
-                this.player.desiredVelocity = new Phaser.Math.Vector2(0, 0);
-                this.player.polygon.active = false;
-                this.player.polygon.visible = false;
+                this.explodePlayer();
             }
             for (const robotPlayer of this.robotPlayers) {
                 if (robotPlayer.polygon.active && Phaser.Math.Distance.BetweenPointsSquared(robotPlayer.polygon.getCenter(), explosion) < GameConstants.explosionRadius ** 2) {
-                    robotPlayer.destroy();
-                    this.createDebris(robotPlayer);
+                    this.explodeRobotPlayer(robotPlayer);
                 }
             }
         }
+    }
+
+    explodePlayer() {
+        this.createDebris(this.player);
+        this.player.body.setVelocity(0, 0);
+        this.player.desiredVelocity = new Phaser.Math.Vector2(0, 0);
+        this.player.polygon.active = false;
+        this.player.polygon.visible = false;
+    }
+
+    explodeRobotPlayer(robotPlayer: RobotShip) {
+        robotPlayer.destroy();
+        this.createDebris(robotPlayer);
     }
 
     update() {
@@ -414,7 +438,7 @@ export class Scene extends Phaser.Scene implements GameInterface {
 
         const isGameOver = this.robotPlayers.every(robotPlayer => !robotPlayer.polygon.active);
         if (isGameOver) {
-            this.gameOver();
+            this.gameOver(true);
         }
 
         const respawnRequired = !this.player.polygon.active;
@@ -509,7 +533,7 @@ export class Scene extends Phaser.Scene implements GameInterface {
 
     private respawnPlayer() {
 
-        if (this.gameState === GameState.Respawning) {
+        if (this.gameState === GameState.Respawning || this.gameState === GameState.GameOver) {
             return;
         }
         this.gameState = GameState.Respawning;
@@ -545,12 +569,12 @@ export class Scene extends Phaser.Scene implements GameInterface {
         });
     }
 
-    private gameOver() {
+    private gameOver(win: boolean) {
 
         this.gameState = GameState.GameOver;
         this.physics.pause();
 
-        const message = this.player.polygon.active ? 'You win!' : 'You lose!';
+        const message = win ? 'You win!' : 'You lose!';
 
         // Add "Game Over" text
         const gameOverText = this.add.text(this.scale.width / 2, this.scale.height / 2, message, {
