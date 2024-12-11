@@ -2,6 +2,7 @@ import 'phaser';
 
 import { GameConstants } from './GameConstants';
 import { Scene } from './Scene';
+import { StartScene } from './StartScene';
 
 document.body.style.margin = '0';
 document.body.style.padding = '0';
@@ -14,7 +15,7 @@ const config: Phaser.Types.Core.GameConfig = {
     width: window.innerWidth,
     height: window.innerHeight,
     backgroundColor: '#000000',
-    scene: new Scene(),
+    scene: [ StartScene, Scene ],
     scale: {
         mode: Phaser.Scale.EXPAND,
         autoCenter: Phaser.Scale.RESIZE,
