@@ -17,9 +17,8 @@ const config: Phaser.Types.Core.GameConfig = {
     backgroundColor: '#000000',
     scene: [ StartScene, Scene ],
     scale: {
-        mode: Phaser.Scale.EXPAND,
-        autoCenter: Phaser.Scale.RESIZE,
-        expandParent: true
+        mode: Phaser.Scale.RESIZE,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     physics: {
         default: 'arcade',

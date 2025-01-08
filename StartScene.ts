@@ -147,14 +147,22 @@ export class StartScene extends Phaser.Scene {
         const setTextPosition = (gameSize: Phaser.Structs.Size) => {
             const centerX = gameSize.width / 2;
             const centerY = gameSize.height / 2;
+            const verticalSpacing = gameSize.height * 0.1;
+            const horizontalSpacing = Math.min(gameSize.width * 0.2, 100);
 
-            introText.setPosition(centerX, centerY - 100);
-            easyText.setPosition(centerX - 100, centerY + 100);
-            hardText.setPosition(centerX + 100, centerY + 100);
-            startText.setPosition(centerX, centerY + 200);
-            enemyCountText.setPosition(centerX, centerY);
-            plusButton.setPosition(centerX + 130, centerY);
-            minusButton.setPosition(centerX - 130, centerY);
+            introText.setPosition(centerX, centerY - verticalSpacing * 3);
+            enemyCountText.setPosition(centerX, centerY - verticalSpacing);
+            plusButton.setPosition(
+                enemyCountText.x + enemyCountText.displayWidth / 2 + plusButton.displayWidth / 2 + 10,
+                centerY - verticalSpacing
+            );
+            minusButton.setPosition(
+                enemyCountText.x - enemyCountText.displayWidth / 2 - minusButton.displayWidth / 2 - 10,
+                centerY - verticalSpacing
+            );
+            easyText.setPosition(centerX - horizontalSpacing, centerY + verticalSpacing);
+            hardText.setPosition(centerX + horizontalSpacing, centerY + verticalSpacing);
+            startText.setPosition(centerX, centerY + 2 * verticalSpacing);
             copyrightText.setPosition(centerX, gameSize.height - 10);
         }
 
@@ -162,7 +170,9 @@ export class StartScene extends Phaser.Scene {
 
         this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
             setTextPosition(gameSize);
-            graphics.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height);
+            if (this.cameras.main) {
+                graphics.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height);
+            }
         });
     }
 
