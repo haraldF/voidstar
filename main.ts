@@ -35,3 +35,10 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 const game = new Phaser.Game(config);
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+        const registration = await navigator.serviceWorker.register('/service-worker.js');
+        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+    });
+}

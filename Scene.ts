@@ -3,6 +3,7 @@ import { GameConstants } from './GameConstants';
 import { Ship } from './Ship';
 import { RobotShip } from './RobotShip';
 import { GameInterface } from './GameInterface';
+import { Sounds } from './Sounds';
 
 const enum GameState {
     BeforeStart,
@@ -17,6 +18,8 @@ interface TorpedoProperties {
     destinationMarker?: Phaser.GameObjects.Graphics;
     emitter: Phaser.GameObjects.Particles.ParticleEmitter;
 }
+
+type ArcadeBody = Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody | Phaser.Tilemaps.Tile;
 
 export class Scene extends Phaser.Scene implements GameInterface {
     public player!: Ship;
@@ -35,9 +38,12 @@ export class Scene extends Phaser.Scene implements GameInterface {
 
     private static readonly shipDimensions = [7.5, 0, 0, 25, 15, 25]
 
+    private readonly gameEvents = new Phaser.Events.EventEmitter();
+    private readonly sounds = new Sounds(this.gameEvents);
+
     constructor() {
         super({
-            key: 'game'
+            key: 'game',
         });
     }
 
@@ -62,6 +68,8 @@ export class Scene extends Phaser.Scene implements GameInterface {
                 canvas.refresh();
             }
         }
+
+        this.sounds.preload(this);
     }
 
     create() {
@@ -106,6 +114,8 @@ export class Scene extends Phaser.Scene implements GameInterface {
         for (const robotPlayer of this.robotPlayers) {
             robotPlayer.start(this, this);
         }
+
+        this.sounds.create(this);
 
         this.gameState = GameState.Running;
     }
@@ -179,7 +189,7 @@ export class Scene extends Phaser.Scene implements GameInterface {
         this.physics.add.collider(this.player.polygon, polygon, this.handleShipCollision, undefined, this);
     }
 
-    handleShipCollision(player: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Physics.Arcade.Body | Phaser.Tilemaps.Tile, robot: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Physics.Arcade.Body | Phaser.Tilemaps.Tile) {
+    handleShipCollision(player: ArcadeBody, robot: ArcadeBody) {
         if (this.gameState !== GameState.Running) {
             return;
         }
@@ -248,6 +258,8 @@ export class Scene extends Phaser.Scene implements GameInterface {
                 this.explodeTorpedo(torpedo);
             }
         }, [], this);
+
+        this.gameEvents.emit('torpedo-launched', ship === this.player);
     }
 
     explodeTorpedo(torpedo: Phaser.GameObjects.Graphics) {
@@ -328,6 +340,9 @@ export class Scene extends Phaser.Scene implements GameInterface {
     }
 
     explodePlayer() {
+
+        this.gameEvents.emit('player-exploded');
+
         this.createDebris(this.player);
         this.player.body.setVelocity(0, 0);
         this.player.desiredVelocity = new Phaser.Math.Vector2(0, 0);
